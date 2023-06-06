@@ -30,10 +30,6 @@ parser.add_argument("-V",
 args = parser.parse_args()
 
 
-def requestContent(url):
-    return fetch(url).content
-
-
 def parsePage(page):
     return bs4(page, "html.parser")
 
@@ -46,12 +42,13 @@ def writeZip(file, emotes):
             if (args.verbose > 1):
                 print(f"Writing {emote.get('name')} to {file}")
 
-            # Opens a {imageName}.png to write image
-            with open(f"{emote.get('name')}.png", "wb") as imageFile:
+            # Opens a {imageName}.{type} to write image
+            filename = f"{emote.get('name')}.{emote.get('type').split('/')[1]}"
+            with open(filename, "wb") as imageFile:
                 imageFile.write(emote.get("content"))
             imageFile.close()
-            zipFile.write(f"{emote.get('name')}.png")
-            fileRemove(f"{emote.get('name')}.png")
+            zipFile.write(filename)
+            fileRemove(filename)
     zipFile.close()
 
 
@@ -61,10 +58,12 @@ def buildAllEmotes(names):
     for name in names:
         if regexMatch(r"^[a-zA-Z0-9]+$", name.text):
             url = name.find_previous_sibling("div").find("img")["src"]
+            url = url.replace('/static/', '/default/')
             if (args.verbose > 1):
                 print(f"Downloading {name.text} from {url}")
 
-            emotes.append({"name": name.text, "content": requestContent(url)})
+            response = fetch(url)
+            emotes.append({"name": name.text, "content": response.content, "type": response.headers["content-type"]})
 
     return emotes
 
@@ -72,7 +71,7 @@ def buildAllEmotes(names):
 def main():
     if (args.verbose > 0):
         print(f"Downloading page from {args.url}")
-    parsed_html = parsePage(requestContent(args.url))
+    parsed_html = parsePage(fetch(args.url).content)
 
     if (args.verbose > 0):
         print(f"Downloading emotes from {args.url}")
